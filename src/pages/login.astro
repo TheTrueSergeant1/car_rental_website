@@ -1,0 +1,23 @@
+---
+import LoginForm from '../components/LoginForm.jsx';
+import ThemeManager from '../components/ThemeManager.astro';
+import ThemeToggleButton from '../components/ThemeToggleButton.jsx';
+---
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Login - Prestige Rentals</title>
+    <ThemeManager />
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 font-sans h-full">
+    <div class="absolute top-4 right-4"> <ThemeToggleButton client:load /> </div>
+    <div class="min-h-screen flex flex-col justify-center items-center p-4">
+        <header class="text-center mb-8">
+            <a href="/" class="text-5xl text-gray-800 dark:text-white" style="font-family: 'Playfair Display', serif;">Prestige Rentals</a>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Login or create an account to continue.</p>
+        </header>
+        <main> <LoginForm client:load /> </main>
+    </div>
+</body>
+</html>

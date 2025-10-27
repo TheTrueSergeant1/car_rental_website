@@ -1,0 +1,24 @@
+---
+// This script is inlined in the <head> to prevent FOUC (Flash of Unstyled Content)
+const themeScript = `
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  })();
+
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+  
+  // We need to store it in case the user has no preference but their OS does
+  window.localStorage.setItem('theme', theme);
+`;
+---
+<script is:inline set:html={themeScript} />

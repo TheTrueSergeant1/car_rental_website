@@ -1,0 +1,60 @@
+---
+import CustomerCarSearch from '../components/GuestCarSearch.jsx';
+import ThemeManager from '../components/ThemeManager.astro';
+import ThemeToggleButton from '../components/ThemeToggleButton.jsx';
+---
+<html lang="en" class="h-full scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guest Car Search - Prestige Rentals</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <ThemeManager />
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100">
+
+  <!-- ================= HEADER ================= -->
+  <header class="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50">
+    <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+      <!-- Logo -->
+      <a href="/" class="text-3xl text-gray-800 dark:text-white" style="font-family: 'Playfair Display', serif;">
+        Prestige Rentals
+      </a>
+
+      <!-- Navigation Buttons -->
+      <div class="flex items-center space-x-4">
+        <div class="hidden md:flex space-x-6 text-gray-600 dark:text-gray-300"></div>
+        <a 
+          href="/" 
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        >
+          Home
+        </a>
+
+        <!-- Theme Toggle -->
+        <div class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <ThemeToggleButton client:load />
+        </div>
+
+        <!-- Create Account -->
+        <a 
+          href="../login" 
+          class="px-5 py-2 bg-gray-800 text-white dark:bg-blue-600 dark:text-white font-semibold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+        >
+          Create Account
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ================= MAIN ================= -->
+  <main class="container mx-auto p-8">
+    <CustomerCarSearch client:load />
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,524 @@
+-- =================================================================================================
+-- Filename: car_rental_db_setup.sql
+-- Description: Creates and fills a database for a car rental service. Some test data is used to
+--              allow for testing a web server an to ensure it can handle data.
+-- =================================================================================================
+
+-- =================================================================================================
+-- I. SCHEMA SETUP
+-- =================================================================================================
+
+CREATE SCHEMA IF NOT EXISTS `car_rental_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `car_rental_db`;
+
+-- =================================================================================================
+-- Table cleanup (in case tthe code needs to be run again)
+-- =================================================================================================
+
+DROP TABLE IF EXISTS `RentalAddons`;
+DROP TABLE IF EXISTS `CarFeatures`;
+DROP TABLE IF EXISTS `FavoriteCars`;
+DROP TABLE IF EXISTS `Reviews`;
+DROP TABLE IF EXISTS `CustomerPaymentMethods`;
+DROP TABLE IF EXISTS `Payments`;
+DROP TABLE IF EXISTS `Maintenance`;
+DROP TABLE IF EXISTS `Rentals`;
+DROP TABLE IF EXISTS `Employees`;
+DROP TABLE IF EXISTS `Cars`;
+DROP TABLE IF EXISTS `Customers`;
+DROP TABLE IF EXISTS `Car_Types`;
+DROP TABLE IF EXISTS `Addons`;
+DROP TABLE IF EXISTS `Features`;
+DROP TABLE IF EXISTS `Locations`;
+
+-- =================================================================================================
+-- Creating tables
+-- =================================================================================================
+
+-- Lookup table for car categories.
+CREATE TABLE IF NOT EXISTS `Car_Types` (
+  `car_type_id` INT NOT NULL AUTO_INCREMENT,
+  `type_name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`car_type_id`),
+  UNIQUE INDEX `type_name_UNIQUE` (`type_name` ASC)
+) ENGINE = InnoDB;
+
+-- Stores physical rental locations.
+CREATE TABLE IF NOT EXISTS `Locations` (
+  `location_id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `address` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`location_id`)
+) ENGINE = InnoDB;
+
+-- Customer information and credentials.
+CREATE TABLE IF NOT EXISTS `Customers` (
+  `customer_id` INT NOT NULL AUTO_INCREMENT,
+  `first_name` VARCHAR(45) NOT NULL,
+  `last_name` VARCHAR(45) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `phone_number` VARCHAR(20) NULL,
+  `address` VARCHAR(255) NULL,
+  `city` VARCHAR(45) NULL,
+  `state` VARCHAR(45) NULL,
+  `zip_code` VARCHAR(10) NULL,
+  `date_of_birth` DATE NULL,
+  `password` VARCHAR(255) NULL,
+  `reset_token` VARCHAR(255) NULL,
+  `reset_token_expires` BIGINT NULL,
+  PRIMARY KEY (`customer_id`),
+  UNIQUE INDEX `email_UNIQUE` (`email` ASC)
+) ENGINE = InnoDB;
+
+-- Employee information and credentials.
+CREATE TABLE IF NOT EXISTS `Employees` (
+  `employee_id` INT NOT NULL AUTO_INCREMENT,
+  `first_name` VARCHAR(45) NOT NULL,
+  `last_name` VARCHAR(45) NOT NULL,
+  `job_title` VARCHAR(45) NULL,
+  `hire_date` DATE NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `username` VARCHAR(255) NOT NULL,
+  `password` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`employee_id`),
+  UNIQUE INDEX `email_UNIQUE` (`email` ASC),
+  UNIQUE INDEX `username_UNIQUE` (`username` ASC)
+) ENGINE = InnoDB;
+
+-- Main vehicle inventory table.
+CREATE TABLE IF NOT EXISTS `Cars` (
+  `car_id` INT NOT NULL AUTO_INCREMENT,
+  `make` VARCHAR(45) NOT NULL,
+  `model` VARCHAR(45) NOT NULL,
+  `year` INT NOT NULL,
+  `license_plate` VARCHAR(45) NOT NULL,
+  `daily_rate` DECIMAL(10,2) NOT NULL,
+  `status` VARCHAR(45) NOT NULL,
+  `image_url` VARCHAR(1024) NULL DEFAULT 'https://placehold.co/600x400/222/FFF?text=No+Image',
+  `mileage` INT NULL,
+  `next_service_due_date` DATE NULL,
+  `next_service_details` VARCHAR(255) NULL,
+  `purchase_date` DATE NULL,
+  `previous_owners` VARCHAR(255) NULL,
+  `car_type_id` INT NOT NULL,
+  `location_id` INT NULL,
+  PRIMARY KEY (`car_id`),
+  UNIQUE INDEX `license_plate_UNIQUE` (`license_plate` ASC),
+  INDEX `fk_Cars_Car_Types_idx` (`car_type_id` ASC),
+  INDEX `fk_Cars_Locations_idx` (`location_id` ASC),
+  CONSTRAINT `fk_Cars_Car_Types`
+    FOREIGN KEY (`car_type_id`)
+    REFERENCES `Car_Types` (`car_type_id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Cars_Locations`
+    FOREIGN KEY (`location_id`)
+    REFERENCES `Locations` (`location_id`)
+    ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Core table for rental transactions.
+CREATE TABLE IF NOT EXISTS `Rentals` (
+  `rental_id` INT NOT NULL AUTO_INCREMENT,
+  `customer_id` INT NOT NULL,
+  `car_id` INT NOT NULL,
+  `pickup_date` DATE NOT NULL,
+  `due_date` DATE NULL,
+  `return_date` DATE NULL,
+  `total_cost` DECIMAL(10,2) NULL,
+  `late_fee` DECIMAL(10,2) NULL,
+  PRIMARY KEY (`rental_id`),
+  INDEX `fk_Rentals_Customers_idx` (`customer_id` ASC),
+  INDEX `fk_Rentals_Cars_idx` (`car_id` ASC),
+  CONSTRAINT `fk_Rentals_Customers`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `Customers` (`customer_id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_Rentals_Cars`
+    FOREIGN KEY (`car_id`)
+    REFERENCES `Cars` (`car_id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Tracks payments for each rental.
+CREATE TABLE IF NOT EXISTS `Payments` (
+  `payment_id` INT NOT NULL AUTO_INCREMENT,
+  `rental_id` INT NOT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `payment_date` DATE NOT NULL,
+  `payment_method` VARCHAR(45) NULL,
+  PRIMARY KEY (`payment_id`),
+  INDEX `fk_Payments_Rentals_idx` (`rental_id` ASC),
+  CONSTRAINT `fk_Payments_Rentals`
+    FOREIGN KEY (`rental_id`)
+    REFERENCES `Rentals` (`rental_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Tracks service history for each car.
+CREATE TABLE IF NOT EXISTS `Maintenance` (
+  `maintenance_id` INT NOT NULL AUTO_INCREMENT,
+  `car_id` INT NOT NULL,
+  `service_date` DATE NOT NULL,
+  `service_type` VARCHAR(100) NOT NULL,
+  `cost` DECIMAL(10,2) NULL,
+  `notes` TEXT NULL,
+  `completion_date` DATE NULL,
+  PRIMARY KEY (`maintenance_id`),
+  INDEX `fk_Maintenance_Cars_idx` (`car_id` ASC),
+  CONSTRAINT `fk_Maintenance_Cars`
+    FOREIGN KEY (`car_id`)
+    REFERENCES `Cars` (`car_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Customer reviews for cars.
+CREATE TABLE IF NOT EXISTS `Reviews` (
+  `review_id` INT NOT NULL AUTO_INCREMENT,
+  `car_id` INT NOT NULL,
+  `customer_id` INT NOT NULL,
+  `rating` INT NOT NULL COMMENT 'Rating from 1 to 5',
+  `review_text` TEXT NULL,
+  `review_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`review_id`),
+  INDEX `fk_Reviews_Cars_idx` (`car_id` ASC),
+  INDEX `fk_Reviews_Customers_idx` (`customer_id` ASC),
+  CONSTRAINT `fk_Reviews_Cars`
+    FOREIGN KEY (`car_id`)
+    REFERENCES `Cars` (`car_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_Reviews_Customers`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `Customers` (`customer_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Linking table for customers' favorite cars.
+CREATE TABLE IF NOT EXISTS `FavoriteCars` (
+  `customer_id` INT NOT NULL,
+  `car_id` INT NOT NULL,
+  PRIMARY KEY (`customer_id`, `car_id`),
+  INDEX `fk_FavoriteCars_Cars_idx` (`car_id` ASC),
+  CONSTRAINT `fk_FavoriteCars_Customers`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `Customers` (`customer_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_FavoriteCars_Cars`
+    FOREIGN KEY (`car_id`)
+    REFERENCES `Cars` (`car_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Stores saved payment methods for customers.
+CREATE TABLE IF NOT EXISTS `CustomerPaymentMethods` (
+  `payment_method_id` INT NOT NULL AUTO_INCREMENT,
+  `customer_id` INT NOT NULL,
+  `card_holder_name` VARCHAR(255) NOT NULL,
+  `card_type` VARCHAR(45) NOT NULL,
+  `masked_number` VARCHAR(20) NOT NULL,
+  `expiry_date` VARCHAR(7) NOT NULL COMMENT 'MM/YYYY',
+  `is_primary` BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (`payment_method_id`),
+  INDEX `fk_PaymentMethods_Customers_idx` (`customer_id` ASC),
+  CONSTRAINT `fk_PaymentMethods_Customers`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `Customers` (`customer_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Lookup table for optional rental add-ons.
+CREATE TABLE IF NOT EXISTS `Addons` (
+  `addon_id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `description` TEXT NULL,
+  `price` DECIMAL(10,2) NOT NULL,
+  PRIMARY KEY (`addon_id`)
+) ENGINE = InnoDB;
+
+-- Linking table for rentals and selected add-ons.
+CREATE TABLE IF NOT EXISTS `RentalAddons` (
+  `rental_id` INT NOT NULL,
+  `addon_id` INT NOT NULL,
+  PRIMARY KEY (`rental_id`, `addon_id`),
+  INDEX `fk_RentalAddons_Addons_idx` (`addon_id` ASC),
+  CONSTRAINT `fk_RentalAddons_Rentals`
+    FOREIGN KEY (`rental_id`)
+    REFERENCES `Rentals` (`rental_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_RentalAddons_Addons`
+    FOREIGN KEY (`addon_id`)
+    REFERENCES `Addons` (`addon_id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- Lookup table for specific car features.
+CREATE TABLE IF NOT EXISTS `Features` (
+  `feature_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL UNIQUE
+) ENGINE = InnoDB;
+
+-- Linking table for cars and their features.
+CREATE TABLE IF NOT EXISTS `CarFeatures` (
+  `car_id` INT NOT NULL,
+  `feature_id` INT NOT NULL,
+  PRIMARY KEY (`car_id`, `feature_id`),
+  FOREIGN KEY (`car_id`) REFERENCES `Cars`(`car_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`feature_id`) REFERENCES `Features`(`feature_id`) ON DELETE CASCADE
+) ENGINE = InnoDB;
+
+-- =================================================================================================
+-- Inserting data into tables
+-- =================================================================================================
+
+-- Data for: Car_Types
+INSERT INTO `Car_Types` (`type_name`) VALUES
+('Sedan'), ('SUV'), ('Truck'), ('Convertible'), ('Van');
+
+-- Data for: Locations
+INSERT INTO `Locations` (`name`, `address`) VALUES
+('Prestige Rentals - Conroe Downtown', '202 N Main St, Conroe, TX 77301'),
+('Prestige Rentals - The Woodlands Mall', '1201 Lake Woodlands Dr, The Woodlands, TX 77380'),
+('Prestige Rentals - IAH Airport', '2800 N Terminal Rd, Houston, TX 77032'),
+('Prestige Rentals - Lake Conroe North', '14975 Walden Rd, Montgomery, TX 77356'),
+('Prestige Rentals - Spring/I-45', '21730 I-45, Spring, TX 77373');
+
+-- Data for: Customers
+INSERT INTO `Customers` (`first_name`, `last_name`, `email`, `phone_number`, `address`, `city`, `state`, `zip_code`, `date_of_birth`) VALUES
+('John', 'Doe', 'john.doe@example.com', '555-123-4567', '123 Maple St', 'Anytown', 'CA', '90210', '1985-05-15'),
+('Jane', 'Smith', 'jane.smith@example.com', '555-987-6543', '456 Oak Ave', 'Otherville', 'NY', '10001', '1990-11-20'),
+('Peter', 'Jones', 'peter.jones@example.com', '555-555-5555', '789 Pine Rd', 'Sometown', 'TX', '75001', '1978-02-28'),
+('Mary', 'Johnson', 'mary.johnson@example.com', '555-222-3333', '101 Elm Blvd', 'Anotherplace', 'FL', '33101', '1995-07-04'),
+('Michael', 'Brown', 'michael.brown@example.com', '555-444-5555', '202 Birch Ln', 'Hometown', 'GA', '30303', '1980-09-10'),
+('Jessica', 'Davis', 'jessica.davis@example.com', '555-666-7777', '303 Cedar Dr', 'Villageton', 'WA', '98101', '1992-03-12'),
+('David', 'Miller', 'david.miller@example.com', '555-888-9999', '404 Spruce Ct', 'Cityville', 'IL', '60601', '1988-12-01'),
+('Sarah', 'Wilson', 'sarah.wilson@example.com', '555-111-2222', '505 Poplar Ave', 'Ruralton', 'AZ', '85001', '1975-06-25'),
+('Chris', 'Taylor', 'chris.taylor@example.com', '555-333-4444', '606 Willow St', 'Suburbia', 'CO', '80202', '1998-01-08'),
+('Jennifer', 'Moore', 'jennifer.moore@example.com', '555-777-8888', '707 Aspen Rd', 'Bigtown', 'PA', '19101', '1983-10-30'),
+('William', 'Clark', 'william.clark@example.com', '555-999-0000', '808 Cherry Ln', 'Metropolis', 'OH', '43201', '1987-04-18'),
+('Amanda', 'Lewis', 'amanda.lewis@example.com', '555-000-1111', '909 Magnolia Dr', 'Smallville', 'MI', '48201', '1994-08-22'),
+('James', 'Hall', 'james.hall@example.com', '555-123-4444', '111 Sycamore Ct', 'Oakwood', 'VA', '22201', '1970-01-15'),
+('Elizabeth', 'Allen', 'elizabeth.allen@example.com', '555-234-5678', '222 Holly Blvd', 'Pineville', 'MD', '20701', '1991-05-09'),
+('Ryan', 'Young', 'ryan.young@example.com', '555-345-6789', '333 Elm St', 'Riverton', 'NV', '89101', '1986-09-02'),
+('Nicole', 'Hernandez', 'nicole.hernandez@example.com', '555-456-7890', '444 Oak St', 'Mountainville', 'ID', '83701', '1997-12-28'),
+('Daniel', 'King', 'daniel.king@example.com', '555-567-8901', '555 Cedar Rd', 'Lakeview', 'UT', '84101', '1984-03-10'),
+('Lauren', 'Wright', 'lauren.wright@example.com', '555-678-9012', '666 Birch Ln', 'Hillside', 'NM', '87101', '1996-06-14'),
+('Kevin', 'Lopez', 'kevin.lopez@example.com', '555-789-0123', '777 Pine Ave', 'Valleymeadow', 'KS', '66001', '1979-04-05'),
+('Melissa', 'Hill', 'melissa.hill@example.com', '555-890-1234', '888 Spruce St', 'Plainstown', 'NE', '68501', '1993-11-29'),
+('Andrew', 'Scott', 'andrew.scott@example.com', '555-901-2345', '999 Poplar Rd', 'Foreston', 'SC', '29201', '1982-08-11'),
+('Stephanie', 'Green', 'stephanie.green@example.com', '555-012-3456', '121 Willow Ln', 'Beachburg', 'NC', '27501', '1990-02-17'),
+('Joshua', 'Adams', 'joshua.adams@example.com', '555-123-4567', '232 Aspen Dr', 'Harbortown', 'LA', '70112', '1989-07-23'),
+('Samantha', 'Baker', 'samantha.baker@example.com', '555-234-5678', '343 Cherry St', 'Portsville', 'MS', '39201', '1999-04-01'),
+('Justin', 'Carter', 'justin.carter@example.com', '555-345-6789', '454 Magnolia Ave', 'Springfield', 'TN', '37201', '1987-10-06');
+
+-- Data for: Employees
+INSERT INTO `Employees` (`first_name`, `last_name`, `job_title`, `hire_date`, `email`, `username`, `password`) VALUES
+('Emily', 'Clark', 'Manager', '2019-03-10', 'emily.clark@carrental.com', 'eclark', 'hash_placeholder'),
+('Lucas', 'Rodriguez', 'Sales Agent', '2020-05-22', 'lucas.rodriguez@carrental.com', 'lrodriguez', 'hash_placeholder'),
+('Olivia', 'Harris', 'Sales Agent', '2021-01-15', 'olivia.harris@carrental.com', 'oharris', 'hash_placeholder'),
+('Noah', 'Martin', 'Mechanic', '2018-08-01', 'noah.martin@carrental.com', 'nmartin', 'hash_placeholder'),
+('Ava', 'Young', 'Sales Agent', '2022-04-19', 'ava.young@carrental.com', 'ayoung', 'hash_placeholder'),
+('Benjamin', 'Lopez', 'Manager', '2017-06-25', 'benjamin.lopez@carrental.com', 'blopez', 'hash_placeholder'),
+('Isabella', 'Garcia', 'Sales Agent', '2020-09-05', 'isabella.garcia@carrental.com', 'igarcia', 'hash_placeholder'),
+('Mason', 'Moore', 'Mechanic', '2019-11-30', 'mason.moore@carrental.com', 'mmoore', 'hash_placeholder'),
+('Sophia', 'Hernandez', 'Sales Agent', '2023-02-18', 'sophia.hernandez@carrental.com', 'shernandez', 'hash_placeholder'),
+('Ethan', 'King', 'Manager', '2016-12-01', 'ethan.king@carrental.com', 'eking', 'hash_placeholder'),
+('Mia', 'Wright', 'Sales Agent', '2021-07-09', 'mia.wright@carrental.com', 'mwright', 'hash_placeholder'),
+('Alexander', 'Scott', 'Sales Agent', '2022-06-14', 'alexander.scott@carrental.com', 'ascott', 'hash_placeholder'),
+('Charlotte', 'Green', 'Mechanic', '2020-02-28', 'charlotte.green@carrental.com', 'cgreen', 'hash_placeholder'),
+('James', 'Adams', 'Sales Agent', '2023-01-01', 'james.adams@carrental.com', 'jadams', 'hash_placeholder'),
+('Amelia', 'Baker', 'Manager', '2018-10-10', 'amelia.baker@carrental.com', 'abaker', 'hash_placeholder'),
+('Liam', 'Carter', 'Sales Agent', '2021-04-22', 'liam.carter@carrental.com', 'lcarter', 'hash_placeholder'),
+('Harper', 'Edwards', 'Sales Agent', '2022-11-17', 'harper.edwards@carrental.com', 'hedwards', 'hash_placeholder'),
+('Sebastian', 'Nelson', 'Mechanic', '2019-09-01', 'sebastian.nelson@carrental.com', 'snelson', 'hash_placeholder'),
+('Evelyn', 'Hill', 'Sales Agent', '2023-03-05', 'evelyn.hill@carrental.com', 'ehill', 'hash_placeholder'),
+('Jack', 'Gonzalez', 'Manager', '2017-07-04', 'jack.gonzalez@carrental.com', 'jgonzalez', 'hash_placeholder'),
+('Chloe', 'Perez', 'Sales Agent', '2021-08-12', 'chloe.perez@carrental.com', 'cperez', 'hash_placeholder'),
+('Leo', 'Rivera', 'Sales Agent', '2022-01-20', 'leo.rivera@carrental.com', 'lrivera', 'hash_placeholder'),
+('Zoe', 'Cook', 'Mechanic', '2020-10-10', 'zoe.cook@carrental.com', 'zcook', 'hash_placeholder'),
+('Wyatt', 'Watson', 'Sales Agent', '2023-04-01', 'wyatt.watson@carrental.com', 'wwatson', 'hash_placeholder'),
+('Nora', 'Richardson', 'Manager', '2018-05-15', 'nora.richardson@carrental.com', 'nrichardson', 'hash_placeholder'),
+('Default', 'User', 'Admin', CURDATE(), 'user@carrental.com', 'user', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb');
+
+-- Data for: Cars
+INSERT INTO `Cars` (`make`, `model`, `year`, `license_plate`, `daily_rate`, `car_type_id`, `status`, `image_url`) VALUES
+('Honda', 'Civic', 2021, 'ABC-123', 45.00, 1, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F13%2FHonda-Civic-EG-Hatch-Transparent-File.png&f=1&nofb=1&ipt=e8b9acf553de2c297ee05ab23f07623bea8b4dc5937550633c7b3d52d97c9481'),
+('Toyota', 'RAV4', 2022, 'DEF-456', 60.00, 2, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fd2ivfcfbdvj3sm.cloudfront.net%2F7fc965ab77efe6e0fa62e4ca1ea7673bb65a4554091e3d8e88cb10%2Fstills_0640_png%2FMY2022%2F50452%2F50452_st0640_116.png&f=1&nofb=1&ipt=a2550da8fe49214078816b8bfcceee68ca7530e9e6ae8aec53a1770f2b47ce5d'),
+('Ford', 'F-150', 2020, 'GHI-789', 75.00, 3, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ffile.kelleybluebookimages.com%2Fkbb%2Fbase%2Fevox%2FCP%2F13233%2F2019-Ford-F150%2520SuperCrew%2520Cab-front_13233_032_2400x1800_UG.png&f=1&nofb=1&ipt=2f0581838bcaa6416247cab87ac14b7ddb4efefdd41db64c5c4f5cb9157e12fd'),
+('Chevrolet', 'Corvette', 2023, 'JKL-012', 120.00, 4, 'Maintenance', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngarts.com%2Ffiles%2F3%2FChevrolet-Corvette-PNG-Transparent-Image.png&f=1&nofb=1&ipt=70854befce1d4afd4809176f4c388990921762e5ac29ca0c87688eee5faf395b'),
+('Nissan', 'Versa', 2021, 'MNO-345', 40.00, 1, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.nissanusa.com%2Fcontent%2Fdam%2FNissan%2Fus%2Fvehicles%2Fversa_sedan%2F2021%2Foverview%2F2021-nissan-versa-sedan.png&f=1&nofb=1&ipt=755eefa255828991c59c6147f250a2328e74ab1495e5a377494304473af73d90'),
+('Hyundai', 'Tucson', 2022, 'PQR-678', 65.00, 2, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fimages.dealer.com%2Fddc%2Fvehicles%2F2022%2FHyundai%2FTucson%2520Hybrid%2FSUV%2Fperspective%2Ffront-left%2F2022_24.png&f=1&nofb=1&ipt=6fd178b23ae1a6c6c07ba5071391987d332c8ee0426286dabcba5eb0d0398fbb'),
+('Ram', '1500', 2021, 'STU-901', 80.00, 3, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fvehicle-images.dealerinspire.com%2Fstock-images%2Fthumbnails%2Flarge%2Fchrome%2F0c7528d8af3ca56f2f13e8dffc6f7df9.png&f=1&nofb=1&ipt=b4b569b7a4cb06f264eef33dbf25a4f600c8c69de9a100e55083750cfacceffa'),
+('Jeep', 'Wrangler', 2023, 'VWX-234', 90.00, 4, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ffile.kelleybluebookimages.com%2Fkbb%2Fbase%2Fevox%2FCP%2F50481%2F2023-Jeep-Wrangler-front_50481_032_1917x1012_PRC_cropped.png&f=1&nofb=1&ipt=e45061b09735e12a54955291c08aa29277a8efb0ee030c7d2336d4259ef8b52f'),
+('Kia', 'Seltos', 2022, 'YZA-567', 55.00, 2, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fplatform.cstatic-images.com%2Fin%2Fv2%2Fstock_photos%2F172304e7-c041-4f0b-8606-026ccc5c58e2%2F21edbab7-d005-4a24-8810-65d09b2240f9.png&f=1&nofb=1&ipt=3fd4405ac8c0262fc4f51dc6da4f51ce4d4fec8e51f63a7a469fe1d0404236c3'),
+('Subaru', 'Outback', 2021, 'BCD-890', 65.00, 2, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftoppng.com%2Fuploads%2Fpreview%2Fsubaru-cars-no-background-11664056885agyilukjjr.png&f=1&nofb=1&ipt=03bb17013c3849fada4f828a72c304299559967866ccefa59a1e95a35a0612e9'),
+('Mercedes-Benz', 'C-Class', 2023, 'EFG-123', 150.00, 1, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fdi-uploads-pod7.dealerinspire.com%2Fmercedesbenzofneworleans%2Fuploads%2F2023%2F01%2Fmlp-img-top-2023-cclass-temp.png&f=1&nofb=1&ipt=05b0304faf9508215e976e335c87e31bd1923095f4e2e1aa61ff4a74fe8e64fa'),
+('BMW', 'X5', 2022, 'HIJ-456', 180.00, 2, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F13%2FBMW-X5-PNG-Clipart-Background.png&f=1&nofb=1&ipt=a09025dc97cc97372f38ff0aa9798d354245e70920d23749d0a4dd2c90a2ac38'),
+('Audi', 'A4', 2021, 'KLM-789', 140.00, 1, 'Maintenance', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F13%2FAudi-A4-Download-Free-PNG.png&f=1&nofb=1&ipt=ffac0d7ca79e20f52dc2290bc2c33ef4be028901fdcd185d60ebbf81a90e9225'),
+('Tesla', 'Model 3', 2023, 'NOP-012', 130.00, 1, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fplatform.cstatic-images.com%2Fin%2Fv2%2Fstock_photos%2F94ac9287-d0c1-4332-9fb9-0ce9664600ac%2F55addea0-1b61-4b18-99d9-947359cc7b9b.png&f=1&nofb=1&ipt=26ca569dd447bdfe24043cc22b907232f04465f11ea211aea72a229a3c82b216'),
+('Volvo', 'XC90', 2022, 'QRS-345', 110.00, 2, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftoppng.com%2Fuploads%2Fpreview%2Fvolvo-cars-png-file-116644888753g3gvs8a6f.png&f=1&nofb=1&ipt=3b3624d568fc379efec317701c881ea2d07ed084ab4e8425642f6d0111a544ca'),
+('Porsche', '911', 2021, 'TUV-678', 250.00, 4, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fassets.stickpng.com%2Fimages%2F580b585b2edbce24c47b2ca5.png&f=1&nofb=1&ipt=44e5120b740db9f755ddfad9a8b8a987b0dcf32b410966f1a7e68d3cc29a0492'),
+('Lexus', 'RX', 2023, 'WXY-901', 100.00, 2, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.lexusstevenscreek.com%2Fstatic%2Fbrand-lexus%2Fvehicle%2F2023%2FRX-500-Hybrid%2FLEX-RXF-MY23-0001.png&f=1&nofb=1&ipt=272602997e92a614feb819b2bf32d58758d91973838b09dfd7f101f592d29340'),
+('Ford', 'Mustang', 2022, 'ZAB-234', 95.00, 4, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.motortrend.com%2Fuploads%2Fsites%2F10%2F2016%2F06%2F2017-ford-mustang-gt-premium-coupe-angular-front.png&f=1&nofb=1&ipt=7cbf45329dda8e8fee5db58a41205698e9c2e40aeaef64e7cd19b75935bfbd1e'),
+('Volkswagen', 'Jetta', 2021, 'CDE-567', 50.00, 1, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fvexstockimages.fastly.carvana.io%2Fstockimages%2F2021_VOLKSWAGEN_JETTA_1.4T%2520R-LINE%2520SEDAN%25204D_BLACK_stock_desktop_1920x1080.png%3Fv%3D1645597311.391%3Fwidth%3D600&f=1&nofb=1&ipt=5edeb9a8e5721e219679d24aae40737f84b7df5681572f0036f81e58b92e202f'),
+('GMC', 'Sierra', 2023, 'FGH-890', 85.00, 3, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fimages.dealer.com%2Fddc%2Fvehicles%2F2023%2FGMC%2FSierra%25201500%2FTruck%2Fperspective%2Ffront-left%2F2022_24.png&f=1&nofb=1&ipt=4a5f92c5b3a1c3529b633651a8ec63c8e5e84837a49636baa2a60bbe0ca42cc1'),
+('Chevrolet', 'Malibu', 2022, 'IJK-123', 55.00, 1, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fplatform.cstatic-images.com%2Fin%2Fv2%2Fstock_photos%2Fb8d080d5-fd3b-4c58-9dc0-a4e3c106b979%2F0b83e192-7acc-4ac1-983f-a6a7334df848.png&f=1&nofb=1&ipt=8a24038fb6e5c111fcc23fbf7dd5565421c48afd867c31173433f8fbebfe1a8d'),
+('Honda', 'CRV', 2021, 'LMN-456', 65.00, 2, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi2.wp.com%2Finventory-dmg.assets-cdk.com%2FChromeColorMatch%2Fus%2FTRANSPARENT_cc_2021HOS020019_01_1280_BS.png&f=1&nofb=1&ipt=2c2ba88182d1d39610c50078682b88b6d19e2c629ba7aa6a1fe306ffbacd5a4d'),
+('Ford', 'Explorer', 2023, 'OPQ-789', 70.00, 2, 'Rented', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fvehicle-images.dealerinspire.com%2Fstock-images%2Fford%2F7a334baa5877849d0bb09dd7068f5fa4.png&f=1&nofb=1&ipt=115ffa32ccee1c5b8b2e12c7420a9636cc1094f1300ac55658651fb3ff86b0a3'),
+('Toyota', 'Tacoma', 2022, 'RST-012', 80.00, 3, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fimages.dealer.com%2Fddc%2Fvehicles%2F2022%2FToyota%2FTacoma%2FTruck%2Fperspective%2Ffront-left%2F2022_76.png&f=1&nofb=1&ipt=2f54cb3c2932ceb4fec7c0651771852dcb76c92d3bff9e63ab442d63ae98d954'),
+('Honda', 'Odyssey', 2021, 'UVW-345', 70.00, 5, 'Available', 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ffile.kelleybluebookimages.com%2Fkbb%2Fbase%2Fevox%2FCP%2F15482%2F2021-Honda-Odyssey-front_15482_032_1847x813_SV_cropped.png&f=1&nofb=1&ipt=915c1ddc594c69b43cee20ef819caed1fe1e1f2cd4f1cd3d51a59c2800afc45d') ;
+
+-- Data for: Rentals
+INSERT INTO `Rentals` (`customer_id`, `car_id`, `pickup_date`, `return_date`, `total_cost`) VALUES
+(1, 3, '2023-01-01', '2023-01-05', 300.00),
+(2, 6, '2023-01-02', '2023-01-07', 325.00),
+(3, 10, '2023-01-03', NULL, NULL),
+(4, 14, '2023-01-04', '2023-01-10', 780.00),
+(5, 17, '2023-01-05', NULL, NULL),
+(6, 21, '2023-01-06', '2023-01-12', 385.00),
+(7, 23, '2023-01-07', NULL, NULL),
+(8, 1, '2023-01-08', '2023-01-15', 315.00),
+(9, 2, '2023-01-09', NULL, NULL),
+(10, 4, '2023-01-10', '2023-01-14', 480.00),
+(11, 5, '2023-01-11', '2023-01-18', 320.00),
+(12, 7, '2023-01-12', NULL, NULL),
+(13, 8, '2023-01-13', '2023-01-20', 630.00),
+(14, 9, '2023-01-14', NULL, NULL),
+(15, 11, '2023-01-15', '2023-01-22', 1050.00),
+(16, 12, '2023-01-16', NULL, NULL),
+(17, 13, '2023-01-17', '2023-01-24', 980.00),
+(18, 15, '2023-01-18', NULL, NULL),
+(19, 16, '2023-01-19', '2023-01-26', 1750.00),
+(20, 18, '2023-01-20', NULL, NULL),
+(21, 19, '2023-01-21', '2023-01-28', 350.00),
+(22, 20, '2023-01-22', NULL, NULL),
+(23, 22, '2023-01-23', '2023-01-30', 455.00),
+(24, 24, '2023-01-24', NULL, NULL),
+(25, 25, '2023-01-25', '2023-02-01', 490.00);
+
+-- Data for: Payments
+INSERT INTO `Payments` (`rental_id`, `amount`, `payment_date`, `payment_method`) VALUES
+(1, 300.00, '2023-01-05', 'Credit Card'),
+(2, 325.00, '2023-01-07', 'Cash'),
+(4, 780.00, '2023-01-10', 'Online'),
+(6, 385.00, '2023-01-12', 'Credit Card'),
+(8, 315.00, '2023-01-15', 'Credit Card'),
+(10, 480.00, '2023-01-14', 'Credit Card'),
+(11, 320.00, '2023-01-18', 'Cash'),
+(13, 630.00, '2023-01-20', 'Online'),
+(15, 1050.00, '2023-01-22', 'Credit Card'),
+(17, 980.00, '2023-01-24', 'Credit Card'),
+(19, 1750.00, '2023-01-26', 'Online'),
+(21, 350.00, '2023-01-28', 'Cash'),
+(23, 455.00, '2023-01-30', 'Credit Card'),
+(25, 490.00, '2023-02-01', 'Online'),
+(1, 0.00, '2023-01-01', 'Deposit'),
+(2, 0.00, '2023-01-02', 'Deposit'),
+(3, 0.00, '2023-01-03', 'Deposit'),
+(4, 0.00, '2023-01-04', 'Deposit'),
+(5, 0.00, '2023-01-05', 'Deposit'),
+(6, 0.00, '2023-01-06', 'Deposit'),
+(7, 0.00, '2023-01-07', 'Deposit'),
+(8, 0.00, '2023-01-08', 'Deposit'),
+(9, 0.00, '2023-01-09', 'Deposit'),
+(10, 0.00, '2023-01-10', 'Deposit'),
+(11, 0.00, '2023-01-11', 'Deposit');
+
+-- Data for: Maintenance
+INSERT INTO `Maintenance` (`car_id`, `service_date`, `service_type`, `cost`, `notes`) VALUES
+(1, '2023-05-20', 'Oil Change', 45.00, 'Standard oil and filter change.'),
+(2, '2023-07-10', 'Tire Rotation', 30.00, 'Routine tire rotation.'),
+(3, '2023-08-05', 'Brake Pad Replacement', 250.00, 'Replaced front brake pads and rotors.'),
+(4, '2023-04-01', 'Fluid Check', 0.00, 'Checked all fluids, no issues.'),
+(5, '2023-06-15', 'Full Service Inspection', 120.00, 'Comprehensive check of all systems.'),
+(6, '2023-09-12', 'Battery Replacement', 150.00, 'Replaced old battery with a new one.'),
+(7, '2023-03-25', 'Oil Change', 45.00, 'Routine oil and filter change.'),
+(8, '2023-05-08', 'Tire Rotation', 30.00, 'Rotated all four tires.'),
+(9, '2023-07-22', 'Air Filter Replacement', 25.00, 'Replaced engine and cabin air filters.'),
+(10, '2023-09-01', 'Transmission Fluid Flush', 200.00, 'Flushed and replaced transmission fluid.'),
+(11, '2023-04-18', 'Oil Change', 60.00, 'High-performance synthetic oil change.'),
+(12, '2023-08-10', 'Brake Pad Replacement', 280.00, 'Replaced rear brake pads and bled lines.'),
+(13, '2023-02-14', 'Wheel Alignment', 85.00, 'Adjusted front and rear wheel alignment.'),
+(14, '2023-06-05', 'Tire Rotation', 30.00, 'Routine tire rotation.'),
+(15, '2023-10-03', 'Oil Change', 45.00, 'Standard oil and filter change.'),
+(16, '2023-03-01', 'Fluid Check', 0.00, 'Checked fluids before a long-term rental.'),
+(17, '2023-07-19', 'Spark Plug Replacement', 150.00, 'Replaced all spark plugs.'),
+(18, '2023-01-28', 'Oil Change', 45.00, 'Standard oil and filter change.'),
+(19, '2023-08-30', 'Tire Rotation', 30.00, 'Rotated all four tires.'),
+(20, '2023-05-11', 'Brake System Check', 50.00, 'Inspected entire brake system.'),
+(21, '2023-04-05', 'Full Service Inspection', 100.00, 'Comprehensive vehicle inspection.'),
+(22, '2023-09-18', 'Oil Change', 45.00, 'Standard oil and filter change.'),
+(23, '2023-07-15', 'Tire Rotation and Balance', 60.00, 'Rotated and balanced all tires.'),
+(24, '2023-10-29', 'Windshield Wiper Replacement', 20.00, 'Replaced front wipers.'),
+(25, '2023-02-22', 'Oil Change', 45.00, 'Routine oil and filter change.'),
+(1, '2021-08-25', 'Oil Change', 45.00, 'First scheduled oil and filter change.'),
+(1, '2022-03-10', 'Tire Rotation', 30.00, 'Routine tire rotation.'),
+(1, '2022-06-15', 'Oil Change', 45.00, 'Second oil change.'),
+(1, '2022-11-01', 'Brake Pad Replacement', 180.00, 'Replaced front brake pads.'),
+(1, '2023-02-20', 'Fluid Check', 20.00, 'Checked all fluid levels.'),
+(1, '2023-08-15', 'Wheel Alignment', 85.00, 'Performed wheel alignment.'),
+(1, '2023-12-01', 'Battery Check', 0.00, 'Checked battery health.'),
+(1, '2024-03-05', 'Oil Change', 50.00, 'Fourth oil change.'),
+(1, '2024-06-20', 'Tire Replacement', 450.00, 'Replaced all four tires.'),
+(1, '2024-09-10', 'Full Inspection', 150.00, 'Comprehensive inspection.'),
+(1, '2025-01-15', 'Oil Change', 50.00, 'Fifth oil change.'),
+(1, '2025-04-30', 'Coolant Flush', 90.00, 'Coolant system flush and refill.'),
+(1, '2025-07-20', 'AC Service', 120.00, 'Recharged AC system.'),
+(1, '2025-09-15', 'Windshield Wiper Replacement', 25.00, 'Replaced front wipers.'),
+(1, '2021-12-10', 'Oil Change', 45.00, 'Scheduled maintenance.'),
+(1, '2022-09-15', 'Brake Service', 210.00, 'Replaced rear brake pads.'),
+(1, '2023-03-30', 'Suspension Check', 60.00, 'Inspected suspension components.'),
+(1, '2023-11-25', 'Battery Replacement', 150.00, 'Replaced battery.'),
+(1, '2024-04-10', 'Oil Change', 50.00, 'Sixth oil change.'),
+(1, '2024-08-01', 'Tire Rotation', 35.00, 'Routine tire rotation.'),
+(1, '2025-02-18', 'Belt Replacement', 95.00, 'Replaced serpentine belt.'),
+(1, '2025-06-05', 'Exhaust System Check', 40.00, 'Inspected exhaust system for leaks.'),
+(1, '2025-08-20', 'Bulb Replacement', 15.00, 'Replaced a headlight bulb.'),
+(1, '2025-09-10', 'Pre-rental Check', 0.00, 'Checked car before a new rental.');
+
+-- Data for: Addons
+INSERT INTO `Addons` (`name`, `description`, `price`) VALUES
+('Collision Damage Waiver', 'Reduces your financial liability for damage to the vehicle.', 29.99),
+('GPS Navigation Unit', 'Never get lost with our easy-to-use GPS device.', 14.99),
+('Child Safety Seat', 'Ensure the safety of your young ones. Suitable for children up to 40 lbs.', 12.50),
+('Prepaid Fuel Option', 'Return the car at any fuel level without worrying about refueling charges.', 55.00);
+
+-- =================================================================================================
+-- Updating previous data
+-- =================================================================================================
+
+-- Populate additional car details
+UPDATE `Cars` SET `mileage` = 55000, `purchase_date` = '2021-02-10', `previous_owners` = 'Acme Dealership' WHERE `car_id` = 1;
+UPDATE `Cars` SET `mileage` = 32000, `purchase_date` = '2022-04-15', `previous_owners` = 'Bayside Auto' WHERE `car_id` = 2;
+UPDATE `Cars` SET `mileage` = 78000, `purchase_date` = '2020-03-20', `previous_owners` = 'City Motors' WHERE `car_id` = 3;
+UPDATE `Cars` SET `mileage` = 15000, `purchase_date` = '2023-01-05', `previous_owners` = 'Luxury Lease Co.' WHERE `car_id` = 4;
+UPDATE `Cars` SET `mileage` = 62000, `purchase_date` = '2021-05-25', `previous_owners` = 'Southside Cars' WHERE `car_id` = 5;
+UPDATE `Cars` SET `mileage` = 41000, `purchase_date` = '2022-07-01', `previous_owners` = 'Private Seller' WHERE `car_id` = 6;
+UPDATE `Cars` SET `mileage` = 75000, `purchase_date` = '2021-04-10', `previous_owners` = 'Auto Exchange' WHERE `car_id` = 7;
+UPDATE `Cars` SET `mileage` = 20000, `purchase_date` = '2023-03-18', `previous_owners` = 'Acme Dealership' WHERE `car_id` = 8;
+UPDATE `Cars` SET `mileage` = 35000, `purchase_date` = '2022-05-20', `previous_owners` = 'Bayside Auto' WHERE `car_id` = 9;
+UPDATE `Cars` SET `mileage` = 68000, `purchase_date` = '2021-06-12', `previous_owners` = 'City Motors' WHERE `car_id` = 10;
+UPDATE `Cars` SET `mileage` = 12000, `purchase_date` = '2023-02-28', `previous_owners` = 'Luxury Lease Co.' WHERE `car_id` = 11;
+UPDATE `Cars` SET `mileage` = 38000, `purchase_date` = '2022-08-05', `previous_owners` = 'Southside Cars' WHERE `car_id` = 12;
+UPDATE `Cars` SET `mileage` = 50000, `purchase_date` = '2021-03-01', `previous_owners` = 'Private Seller' WHERE `car_id` = 13;
+UPDATE `Cars` SET `mileage` = 18000, `purchase_date` = '2023-04-20', `previous_owners` = 'Auto Exchange' WHERE `car_id` = 14;
+UPDATE `Cars` SET `mileage` = 45000, `purchase_date` = '2022-09-15', `previous_owners` = 'Acme Dealership' WHERE `car_id` = 15;
+UPDATE `Cars` SET `mileage` = 10000, `purchase_date` = '2021-01-20', `previous_owners` = 'Bayside Auto' WHERE `car_id` = 16;
+UPDATE `Cars` SET `mileage` = 29000, `purchase_date` = '2023-05-10', `previous_owners` = 'City Motors' WHERE `car_id` = 17;
+UPDATE `Cars` SET `mileage` = 22000, `purchase_date` = '2022-03-05', `previous_owners` = 'Luxury Lease Co.' WHERE `car_id` = 18;
+UPDATE `Cars` SET `mileage` = 60000, `purchase_date` = '2021-07-22', `previous_owners` = 'Southside Cars' WHERE `car_id` = 19;
+UPDATE `Cars` SET `mileage` = 17000, `purchase_date` = '2023-06-01', `previous_owners` = 'Private Seller' WHERE `car_id` = 20;
+UPDATE `Cars` SET `mileage` = 48000, `purchase_date` = '2022-02-15', `previous_owners` = 'Auto Exchange' WHERE `car_id` = 21;
+UPDATE `Cars` SET `mileage` = 53000, `purchase_date` = '2021-09-01', `previous_owners` = 'Acme Dealership' WHERE `car_id` = 22;
+UPDATE `Cars` SET `mileage` = 27000, `purchase_date` = '2023-07-08', `previous_owners` = 'Bayside Auto' WHERE `car_id` = 23;
+UPDATE `Cars` SET `mileage` = 39000, `purchase_date` = '2022-10-25', `previous_owners` = 'City Motors' WHERE `car_id` = 24;
+UPDATE `Cars` SET `mileage` = 58000, `purchase_date` = '2021-08-18', `previous_owners` = 'Luxury Lease Co.' WHERE `car_id` = 25;
+
+-- Distribute cars among the available locations
+UPDATE `Cars` SET `location_id` = 1 WHERE `car_id` IN (1, 6, 11, 16, 21);
+UPDATE `Cars` SET `location_id` = 2 WHERE `car_id` IN (2, 7, 12, 17, 22);
+UPDATE `Cars` SET `location_id` = 3 WHERE `car_id` IN (3, 8, 13, 18, 23);
+UPDATE `Cars` SET `location_id` = 4 WHERE `car_id` IN (4, 9, 14, 19, 24);
+UPDATE `Cars` SET `location_id` = 5 WHERE `car_id` IN (5, 10, 15, 20, 25);
+
+-- =================================================================================================
+-- End of SQL code
+-- =================================================================================================

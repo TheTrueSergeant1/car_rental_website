@@ -1,0 +1,50 @@
+---
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="h-full bg-gray-100">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="A modern car rental website" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+	</head>
+	<body class="h-full font-sans">
+		<nav class="bg-gray-800">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<div class="flex h-16 items-center justify-between">
+					<div class="flex items-center">
+						<a href="/" class="flex-shrink-0 text-white font-bold text-xl">
+							Prestige Rentals
+						</a>
+						<div class="hidden md:block">
+							<div class="ml-10 flex items-baseline space-x-4">
+								<a href="/" class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">Browse Cars</a>
+							</div>
+						</div>
+					</div>
+					<div class="hidden md:block">
+						<div class="ml-4 flex items-center md:ml-6">
+							<a href="/admin/login" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+								Employee Login
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</nav>
+
+		<main class="py-10">
+			<div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+				<slot />
+			</div>
+		</main>
+	</body>
+</html>

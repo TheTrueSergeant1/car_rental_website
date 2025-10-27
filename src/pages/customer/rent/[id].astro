@@ -1,0 +1,68 @@
+---
+// ** THE FIX IS HERE: This line tells Astro to build this page on-demand
+// for each request, which is required for dynamic, database-driven pages.
+export const prerender = false;
+
+import ThemeManager from '../../../components/ThemeManager.astro';
+import ThemeToggleButton from '../../../components/ThemeToggleButton.jsx';
+import RentalFlow from '../../../components/RentalFlow.jsx';
+
+// Get the car ID from the URL (e.g., /customer/rent/5 -> id will be "5")
+const { id } = Astro.params;
+---
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Complete Your Rental - Prestige Rentals</title>
+    <ThemeManager />
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans">
+
+  <header class="bg-white dark:bg-gray-900 shadow-md sticky top-0 z-50 transition-colors duration-300">
+    <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+      <a href="/" class="text-3xl text-gray-800 dark:text-white" style="font-family: 'Playfair Display', serif;">
+        Prestige Rentals
+      </a>
+
+      <div class="flex items-center space-x-4">
+        <div class="hidden md:flex items-center space-x-6 text-gray-600 dark:text-gray-300">
+          <a href="/customer/dashboard" class="text-blue-600 dark:text-blue-400 font-semibold transition-colors">
+            Find a Car
+          </a>
+          <a href="/customer/profile" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            My Profile
+          </a>
+        </div>
+        
+        <div class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <ThemeToggleButton client:load />
+        </div>
+
+        <a 
+          href="#" 
+          id="logoutButton" 
+          class="px-5 py-2 bg-red-600 text-white font-semibold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+        >
+          Logout
+        </a>
+      </div>
+    </nav>
+  </header>
+    <main class="container mx-auto p-8">
+
+        <RentalFlow carId={id!} client:load />
+
+    </main>
+
+     <script>
+      // Standard logout script to clear session and redirect
+      document.getElementById('logoutButton')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('customerUser');
+        sessionStorage.removeItem('customerToken');
+        window.location.href = '/';
+      });
+    </script>
+</body>
+</html>
