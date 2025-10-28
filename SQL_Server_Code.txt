@@ -336,7 +336,7 @@ INSERT INTO `Employees` (`first_name`, `last_name`, `job_title`, `hire_date`, `e
 ('Zoe', 'Cook', 'Mechanic', '2020-10-10', 'zoe.cook@carrental.com', 'zcook', 'hash_placeholder'),
 ('Wyatt', 'Watson', 'Sales Agent', '2023-04-01', 'wyatt.watson@carrental.com', 'wwatson', 'hash_placeholder'),
 ('Nora', 'Richardson', 'Manager', '2018-05-15', 'nora.richardson@carrental.com', 'nrichardson', 'hash_placeholder'),
-('Default', 'User', 'Admin', CURDATE(), 'user@carrental.com', 'user', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb');
+('Default', 'User', 'Admin', CURDATE(), 'user@carrental.com', 'user', '$2b$10$wqCLkwZNNFLLEj1QeMAUQueiHDFPBN6AF8em1SHhhW8GZ/58RPSqu');
 
 -- Data for: Cars
 INSERT INTO `Cars` (`make`, `model`, `year`, `license_plate`, `daily_rate`, `car_type_id`, `status`, `image_url`) VALUES
