@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Main component for the car search page
@@ -12,7 +12,6 @@ export default function CustomerCarSearch() {
   const [notification, setNotification] = useState('');
   const [selectedCar, setSelectedCar] = useState(null);
 
-  // (No changes needed for the logic)
   useEffect(() => {
     const userString = sessionStorage.getItem('customerUser');
     if (userString) {
@@ -20,7 +19,7 @@ export default function CustomerCarSearch() {
       setCustomerId(user.customer_id);
       checkRentalStatus(user.customer_id);
     } else {
-      setCustomerId(0); // Guest users
+      setCustomerId(0);
     }
   }, []);
 
@@ -46,7 +45,8 @@ export default function CustomerCarSearch() {
       const data = await response.json();
       if (Array.isArray(data)) setCars(data);
       else throw new Error(data.error || 'Invalid response from server.');
-    } catch (err) {
+    } catch (err)
+      {
       setError('Failed to fetch cars. The API server may be down.');
       console.error(err);
     } finally {
@@ -102,7 +102,6 @@ export default function CustomerCarSearch() {
   return (
     <div className="font-inter bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="container mx-auto px-6 py-12">
-        {/* Page Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -122,7 +121,6 @@ export default function CustomerCarSearch() {
           </div>
         )}
 
-        {/* Filter and Search Section */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-12">
           <form onSubmit={handleSearch} className="grid md:grid-cols-3 gap-6 items-end">
             <input
@@ -145,7 +143,6 @@ export default function CustomerCarSearch() {
           </form>
         </div>
 
-        {/* Car Grid Section */}
         {loading && <div className="text-center py-16 text-gray-500">Loading available cars...</div>}
         {error && <div className="text-center py-16 text-red-500">{error}</div>}
         
@@ -160,7 +157,6 @@ export default function CustomerCarSearch() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.4 }}
                 >
-                  {/* Car Image with Overlays */}
                   <div className="relative">
                     <img
                       src={car.image_url} alt={`${car.make} ${car.model}`}
@@ -180,7 +176,6 @@ export default function CustomerCarSearch() {
                       <p className="text-sm text-gray-200">{car.year}</p>
                     </div>
                   </div>
-                  {/* Car Details Section */}
                   <div className="p-5 flex flex-col flex-grow">
                     <div className="flex justify-between items-center mb-4">
                       <StarRating rating={car.average_rating} />
@@ -216,7 +211,6 @@ export default function CustomerCarSearch() {
   );
 }
 
-// Redesigned Car Detail Modal
 const CarDetailModal = ({ car, customerId, onClose }) => {
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -261,18 +255,39 @@ const CarDetailModal = ({ car, customerId, onClose }) => {
             <button onClick={onClose} className="text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 text-3xl">&times;</button>
           </div>
           <div className="overflow-y-auto p-6">
-            {loading ? <p>Loading details...</p> : error ? <p className="text-red-500">{error}</p> : details && (
+            {loading ? <p className="text-center text-gray-500 dark:text-gray-400">Loading details...</p> : 
+             error ? <p className="text-center text-red-500">{error}</p> : 
+             details && (
               <>
                 <img src={details.car.image_url} alt={`${details.car.make} ${details.car.model}`} className="w-full h-64 object-cover rounded-lg mb-6"/>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mb-6 text-gray-700 dark:text-gray-300">
                   <p><strong>Type:</strong> {details.car.type_name}</p>
                   <p><strong>Year:</strong> {details.car.year}</p>
                   <p><strong>Mileage:</strong> {details.car.mileage.toLocaleString()}</p>
                   <p><strong>Status:</strong> <span className="font-semibold text-green-600 dark:text-green-400">{details.car.status}</span></p>
                 </div>
-                <button className="w-full mt-4 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-all">
-                  Rent for ${details.car.daily_rate}/day
-                </button>
+
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">Customer Reviews</h3>
+                  <ReviewList reviews={details.reviews || []} />
+                </div>
+                
+                {customerId !== 0 ? (
+                  <a 
+                    href={`/customer/rent/${car.car_id}`} 
+                    className="block w-full mt-6 bg-blue-600 text-white text-center font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-all"
+                  >
+                    Rent for ${details.car.daily_rate}/day
+                  </a>
+                ) : (
+                  <button 
+                    disabled 
+                    className="w-full mt-6 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg cursor-not-allowed"
+                  >
+                    Please log in to rent
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -281,8 +296,65 @@ const CarDetailModal = ({ car, customerId, onClose }) => {
     );
   };
   
+const ReviewList = ({ reviews }) => {
+  const [filter, setFilter] = useState('all');
 
-// Star Rating Helper Component (no changes needed)
+  const filteredReviews = useMemo(() => {
+    if (filter === 'all') {
+      return reviews;
+    }
+    const numericFilter = Number(filter);
+    return reviews.filter(r => Math.round(r.rating) === numericFilter);
+  }, [reviews, filter]);
+
+  const FilterButton = ({ value, label }) => (
+    <button
+      onClick={() => setFilter(value)}
+      className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${
+        filter === value 
+          ? 'bg-blue-600 text-white' 
+          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  if (!reviews || reviews.length === 0) {
+    return <p className="text-gray-500 dark:text-gray-400 italic">No reviews yet for this vehicle.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 mb-4">
+        <FilterButton value="all" label="All" />
+        <FilterButton value="5" label="5 ★" />
+        <FilterButton value="4" label="4 ★" />
+        <FilterButton value="3" label="3 ★" />
+        <FilterButton value="2" label="2 ★" />
+        <FilterButton value="1" label="1 ★" />
+      </div>
+
+      <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+        {filteredReviews.length > 0 ? (
+          filteredReviews.map(review => (
+            <div key={review.review_id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-1">
+                <StarRating rating={review.rating} />
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{review.first_name}</span>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">{review.review_text}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 italic">No reviews match this filter.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+  
+
 const StarRating = ({ rating }) => {
   const stars = [];
   const fullStars = Math.round(rating);
