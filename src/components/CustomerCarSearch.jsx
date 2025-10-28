@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- SVG Icons (No changes needed, but included for completeness) ---
 const UsersIcon = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 );
@@ -12,7 +11,7 @@ const CogIcon = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" /><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M12 2v2" /><path d="M12 22v-2" /><path d="m17 7 1.4-1.4" /><path d="m6.4 18.4 1.4-1.4" /><path d="M22 12h-2" /><path d="M4 12H2" /><path d="m18.4 6.4-1.4 1.4" /><path d="m7.4 17.4-1.4 1.4" /></svg>
 );
 const StarIcon = (props) => (
-  <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
 );
 const SolidStarIcon = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -21,28 +20,33 @@ const SolidStarIcon = (props) => (
 );
 
 export default function CustomerCarSearch() {
-    // --- All your existing state and logic is perfect, no changes needed ---
     const [cars, setCars] = useState([]);
     const [carTypes, setCarTypes] = useState([]);
     const [filters, setFilters] = useState({ type: '', search: '' });
     const [sortOption, setSortOption] = useState('Featured');
     const [customerId, setCustomerId] = useState(null);
-    const [status, setStatus] = useState('authenticating'); // 'authenticating', 'loading', 'success', 'error'
+    const [token, setToken] = useState(null);
+    const [status, setStatus] = useState('authenticating');
     const [notification, setNotification] = useState('');
     const [selectedCar, setSelectedCar] = useState(null);
 
     useEffect(() => {
         const userString = sessionStorage.getItem('customerUser');
-        if (userString) {
+        const tokenString = sessionStorage.getItem('customerToken');
+        
+        if (userString && tokenString) {
             const user = JSON.parse(userString);
             setCustomerId(user.customer_id);
+            setToken(tokenString);
         } else {
+            sessionStorage.clear();
             window.location.href = '/login';
         }
     }, []);
 
     useEffect(() => {
-        if (!customerId) return;
+        if (!customerId || !token) return; 
+        
         setStatus('loading');
         const debounceTimer = setTimeout(async () => {
             try {
@@ -50,8 +54,13 @@ export default function CustomerCarSearch() {
                     const typesRes = await fetch('http://localhost:3001/api/car-types');
                     setCarTypes(await typesRes.json());
                 }
-                const params = new URLSearchParams({ ...filters, customerId });
-                const carsRes = await fetch(`http://localhost:3001/api/cars/available?${params.toString()}`);
+                
+                const params = new URLSearchParams(filters); 
+                const carsRes = await fetch(`http://localhost:3001/api/cars/available?${params.toString()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 if (!carsRes.ok) throw new Error('Server request failed');
                 const carsData = await carsRes.json();
                 setCars(carsData);
@@ -62,7 +71,7 @@ export default function CustomerCarSearch() {
             }
         }, 300);
         return () => clearTimeout(debounceTimer);
-    }, [customerId, filters]);
+    }, [customerId, filters, token]);
 
     const sortedCars = useMemo(() => {
         let sorted = [...cars];
@@ -72,21 +81,35 @@ export default function CustomerCarSearch() {
     }, [cars, sortOption]);
 
     const handleToggleFavorite = useCallback(async (carToToggle) => {
+        if (!token) return;
+
         const isCurrentlyFavorited = carToToggle.is_favorite;
         const newFavoriteStatus = isCurrentlyFavorited ? 0 : 1;
+
         setCars(currentCars => currentCars.map(car =>
             car.car_id === carToToggle.car_id ? { ...car, is_favorite: newFavoriteStatus } : car
         ));
         setNotification(isCurrentlyFavorited ? "Removed from favorites." : "Added to favorites!");
         const notificationTimer = setTimeout(() => setNotification(''), 3000);
+
         try {
-            const url = `http://localhost:3001/api/customers/${customerId}/favorites/${isCurrentlyFavorited ? carToToggle.car_id : ''}`;
-            const res = await fetch(url, {
-                method: isCurrentlyFavorited ? 'DELETE' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: isCurrentlyFavorited ? null : JSON.stringify({ car_id: carToToggle.car_id })
-            });
+            const url = isCurrentlyFavorited
+                ? `http://localhost:3001/api/customers/favorites/${carToToggle.car_id}`
+                : `http://localhost:3001/api/customers/favorites`;
+            
+            const method = isCurrentlyFavorited ? 'DELETE' : 'POST';
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+
+            const body = isCurrentlyFavorited ? null : JSON.stringify({ car_id: carToToggle.car_id });
+
+            const res = await fetch(url, { method, headers, body });
+
             if (!res.ok) throw new Error('API request failed');
+
         } catch (error) {
             clearTimeout(notificationTimer);
             setNotification('Error: Could not update favorites.');
@@ -95,9 +118,9 @@ export default function CustomerCarSearch() {
                 car.car_id === carToToggle.car_id ? { ...car, is_favorite: isCurrentlyFavorited } : car
             ));
         }
-    }, [customerId]);
+    }, [token]);
 
-    if (status === 'authenticating') {
+    if (status === 'authenticating' || !token) {
         return <div className="text-center p-12">Authenticating...</div>;
     }
 
@@ -132,14 +155,11 @@ export default function CustomerCarSearch() {
                 </div>
             </div>
             <AnimatePresence>
-                {selectedCar && <CarDetailModal car={selectedCar} onClose={() => setSelectedCar(null)} customerId={customerId} />}
+                {selectedCar && <CarDetailModal car={selectedCar} onClose={() => setSelectedCar(null)} customerId={customerId} token={token} />}
             </AnimatePresence>
         </div>
     );
 }
-
-// --- Sub-Components ---
-
 const FilterSidebar = ({ filters, setFilters, carTypes }) => (
     <aside className="w-full lg:w-1/4 xl:w-1/5">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg sticky top-8">
@@ -231,7 +251,7 @@ const CarCard = React.memo(({ car, index, onToggleFavorite, onShowDetails }) => 
     </motion.div>
 ));
 
-const ReviewForm = ({ carId, customerId, onReviewSubmitted }) => {
+const ReviewForm = ({ carId, customerId, onReviewSubmitted, token }) => {
     const [rating, setRating] = useState(5);
     const [review_text, setReviewText] = useState('');
     const [error, setError] = useState('');
@@ -248,12 +268,15 @@ const ReviewForm = ({ carId, customerId, onReviewSubmitted }) => {
         try {
             const res = await fetch('http://localhost:3001/api/reviews', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ car_id: carId, customer_id: customerId, rating, review_text })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ car_id: carId, rating, review_text }) 
             });
             const data = await res.json();
             if (data.success) {
-                onReviewSubmitted(); // This will re-fetch the reviews in the modal
+                onReviewSubmitted();
                 setReviewText('');
                 setRating(5);
             } else {
@@ -307,17 +330,20 @@ const ReviewForm = ({ carId, customerId, onReviewSubmitted }) => {
     );
 };
 
-const ReviewList = ({ reviews, customerId, onReviewDeleted }) => {
+const ReviewList = ({ reviews, customerId, onReviewDeleted, token }) => {
     
     const handleDelete = async (reviewId) => {
         if (!window.confirm('Are you sure you want to delete this review?')) return;
         try {
             const res = await fetch(`http://localhost:3001/api/reviews/${reviewId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
             const data = await res.json();
             if (data.success) {
-                onReviewDeleted(); // Re-fetches reviews
+                onReviewDeleted();
             } else {
                 alert('Failed to delete review.');
             }
@@ -353,19 +379,23 @@ const ReviewList = ({ reviews, customerId, onReviewDeleted }) => {
     );
 };
 
-const CarDetailModal = ({ car, onClose, customerId }) => {
+const CarDetailModal = ({ car, onClose, customerId, token }) => {
     const [details, setDetails] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [canReview, setCanReview] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchCarData = useCallback(async () => {
-        if (!customerId || !car.car_id) return;
+        if (!customerId || !car.car_id || !token) return;
+        
         try {
-            // Fetch details and review eligibility in parallel
             const [detailsRes, canReviewRes] = await Promise.all([
-                fetch(`http://localhost:3001/api/cars/${car.car_id}?customerId=${customerId}`),
-                fetch(`http://localhost:3001/api/customers/${customerId}/can-review/${car.car_id}`)
+                fetch(`http://localhost:3001/api/cars/${car.car_id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }),
+                fetch(`http://localhost:3001/api/customers/can-review/${car.car_id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
             ]);
 
             const detailsData = await detailsRes.json();
@@ -382,7 +412,7 @@ const CarDetailModal = ({ car, onClose, customerId }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [car.car_id, customerId]);
+    }, [car.car_id, customerId, token]);
 
     useEffect(() => {
         setIsLoading(true);
@@ -432,24 +462,24 @@ const CarDetailModal = ({ car, onClose, customerId }) => {
                                 ) : <p className="text-gray-500">No specific features listed.</p>}
                             </div>
 
-                            {/* --- NEW REVIEWS SECTION --- */}
                             <div>
                                 <h3 className="text-xl font-semibold border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">Customer Reviews</h3>
                                 <ReviewList 
                                     reviews={reviews} 
                                     customerId={customerId} 
-                                    onReviewDeleted={fetchCarData} // Pass the refresh function
+                                    onReviewDeleted={fetchCarData}
+                                    token={token}
                                 />
                                 
                                 {canReview && (
                                     <ReviewForm 
                                         carId={car.car_id} 
                                         customerId={customerId} 
-                                        onReviewSubmitted={fetchCarData} // Pass the refresh function
+                                        onReviewSubmitted={fetchCarData}
+                                        token={token}
                                     />
                                 )}
                             </div>
-                            {/* --- END NEW REVIEWS SECTION --- */}
 
                         </div>
                     ) : <p className="text-center text-red-500">Could not load car details.</p>}
